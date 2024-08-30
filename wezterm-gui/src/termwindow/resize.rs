@@ -295,7 +295,7 @@ impl super::TermWindow {
         let mux = Mux::get();
         if let Some(window) = mux.get_window(self.mux_window_id) {
             for tab in window.iter() {
-                tab.resize(size);
+                tab.resize(size, false);
             }
         };
         self.resize_overlays();

@@ -626,7 +626,7 @@ impl TermWindow {
             );
             if let Some(window) = mux.get_window(mux_window_id) {
                 for tab in window.iter() {
-                    tab.resize(terminal_size);
+                    tab.resize(terminal_size, false);
                 }
             };
         }
@@ -1268,7 +1268,7 @@ impl TermWindow {
                             self.set_window_size(size, window)?;
                         } else if tab_size.dpi == 0 {
                             log::debug!("fixup dpi in newly added tab");
-                            tab.resize(self.terminal_size);
+                            tab.resize(self.terminal_size, false);
                         }
                     }
                 }
@@ -1335,7 +1335,7 @@ impl TermWindow {
                 let mux = Mux::get();
                 if let Some(window) = mux.get_window(self.mux_window_id) {
                     for tab in window.iter() {
-                        tab.resize(self.terminal_size);
+                        tab.resize(self.terminal_size, false);
                     }
                 };
                 self.update_title();
@@ -3211,7 +3211,7 @@ impl TermWindow {
         let mux = Mux::get();
         for (_, state) in self.tab_state.borrow().iter() {
             if let Some(overlay) = state.overlay.as_ref().map(|o| &o.pane) {
-                overlay.resize(self.terminal_size).ok();
+                overlay.resize(self.terminal_size, false).ok();
             }
         }
         for (pane_id, state) in self.pane_state.borrow().iter() {
@@ -3228,7 +3228,7 @@ impl TermWindow {
                                 * dims.viewport_rows,
                             pixel_width: (self.terminal_size.pixel_width / self.terminal_size.cols)
                                 * dims.cols,
-                        })
+                        }, false)
                         .ok();
                 }
             }

@@ -410,7 +410,7 @@ impl Pane for LocalPane {
         self.terminal.lock().key_up(key, mods)
     }
 
-    fn resize(&self, size: TerminalSize) -> Result<(), Error> {
+    fn resize(&self, size: TerminalSize, _local: bool) -> Result<(), Error> {
         self.pty.lock().resize(PtySize {
             rows: size.rows.try_into()?,
             cols: size.cols.try_into()?,

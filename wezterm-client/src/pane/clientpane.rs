@@ -373,7 +373,7 @@ impl Pane for ClientPane {
         inner.update_last_send();
     }
 
-    fn resize(&self, size: TerminalSize) -> anyhow::Result<()> {
+    fn resize(&self, size: TerminalSize, local: bool) -> anyhow::Result<()> {
         let render = self.renderable.lock();
         let mut inner = render.inner.borrow_mut();
 
@@ -396,18 +396,20 @@ impl Pane for ClientPane {
             let client = Arc::clone(&self.client);
             let remote_pane_id = self.remote_pane_id;
             let remote_tab_id = self.remote_tab_id;
-            promise::spawn::spawn(async move {
-                client
-                    .client
-                    .resize(Resize {
-                        containing_tab_id: remote_tab_id,
-                        pane_id: remote_pane_id,
-                        size,
-                    })
-                    .await
-            })
-            .detach();
-            inner.update_last_send();
+            if !local {
+                promise::spawn::spawn(async move {
+                    client
+                        .client
+                        .resize(Resize {
+                            containing_tab_id: remote_tab_id,
+                            pane_id: remote_pane_id,
+                            size,
+                        })
+                        .await
+                })
+                .detach();
+                inner.update_last_send();
+            }
         }
         Ok(())
     }

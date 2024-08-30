@@ -338,8 +338,8 @@ impl Pane for QuickSelectOverlay {
         self.delegate.writer()
     }
 
-    fn resize(&self, size: TerminalSize) -> anyhow::Result<()> {
-        self.delegate.resize(size)
+    fn resize(&self, size: TerminalSize, local: bool) -> anyhow::Result<()> {
+        self.delegate.resize(size, local)
     }
 
     fn key_up(&self, _key: KeyCode, _mods: KeyModifiers) -> anyhow::Result<()> {
