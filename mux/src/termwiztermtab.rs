@@ -199,7 +199,7 @@ impl Pane for TermWizTerminalPane {
         })
     }
 
-    fn resize(&self, size: TerminalSize) -> anyhow::Result<()> {
+    fn resize(&self, size: TerminalSize, _local: bool) -> anyhow::Result<()> {
         self.input_tx.send(InputEvent::Resized {
             rows: size.rows as usize,
             cols: size.cols as usize,

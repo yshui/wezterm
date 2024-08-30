@@ -235,7 +235,16 @@ pub trait Pane: Downcast + Send + Sync {
     fn send_paste(&self, text: &str) -> anyhow::Result<()>;
     fn reader(&self) -> anyhow::Result<Option<Box<dyn std::io::Read + Send>>>;
     fn writer(&self) -> MappedMutexGuard<dyn std::io::Write>;
-    fn resize(&self, size: TerminalSize) -> anyhow::Result<()>;
+    /// Resize the pane to `size`
+    ///
+    /// # Arguments
+    ///
+    /// * `size` - The new size of the pane
+    /// * `local` - If true, only change the local size of the pane. This is useful
+    ///             when, say, the server has resized the pane and we want to update
+    ///             the size of the pane on our side to reflect that, but we don't
+    ///             want to send a resize request to the server.
+    fn resize(&self, size: TerminalSize, local: bool) -> anyhow::Result<()>;
     /// Called as a hint that the pane is being resized as part of
     /// a zoom-to-fill-all-the-tab-space operation.
     fn set_zoomed(&self, _zoomed: bool) {}
@@ -627,7 +636,7 @@ mod test {
         fn writer(&self) -> MappedMutexGuard<dyn std::io::Write> {
             unimplemented!()
         }
-        fn resize(&self, _: TerminalSize) -> anyhow::Result<()> {
+        fn resize(&self, _size: TerminalSize, _local: bool) -> anyhow::Result<()> {
             unimplemented!()
         }
 

@@ -478,7 +478,7 @@ fn adjust_y_size(tree: &mut Tree, mut y_adjust: isize, cell_dimensions: &Termina
     }
 }
 
-fn apply_sizes_from_splits(tree: &Tree, size: &TerminalSize) {
+fn apply_sizes_from_splits(tree: &Tree, size: &TerminalSize, local: bool) {
     match tree {
         Tree::Empty => return,
         Tree::Node { data: None, .. } => return,
@@ -487,11 +487,11 @@ fn apply_sizes_from_splits(tree: &Tree, size: &TerminalSize) {
             right,
             data: Some(data),
         } => {
-            apply_sizes_from_splits(&*left, &data.first);
-            apply_sizes_from_splits(&*right, &data.second);
+            apply_sizes_from_splits(&*left, &data.first, local);
+            apply_sizes_from_splits(&*right, &data.second, local);
         }
         Tree::Leaf(pane) => {
-            pane.resize(*size).ok();
+            pane.resize(*size, local).ok();
         }
     }
 }
@@ -607,8 +607,8 @@ impl Tab {
     /// this algorithm biases towards adjusting the left/top nodes
     /// first.  For large resizes this tends to proportionally adjust
     /// the relative sizes of the elements in a split.
-    pub fn resize(&self, size: TerminalSize) {
-        self.inner.lock().resize(size)
+    pub fn resize(&self, size: TerminalSize, local: bool) {
+        self.inner.lock().resize(size, local)
     }
 
     /// Called when running in the mux server after an individual pane
@@ -807,7 +807,7 @@ impl TabInner {
         self.zoomed = zoomed;
         self.size = size;
 
-        self.resize(size);
+        self.resize(size, true);
 
         log::debug!(
             "sync tab: {:#?} zoomed: {} {:#?}",
@@ -897,14 +897,14 @@ impl TabInner {
                 pane.set_zoomed(false);
             }
             self.size = self.size_before_zoom;
-            self.resize(size);
+            self.resize(size, false);
         } else {
             // We weren't zoomed, but now we want to zoom.
             // Locate the active pane
             self.size_before_zoom = size;
             if let Some(pane) = self.get_active_pane() {
                 pane.set_zoomed(true);
-                pane.resize(size).ok();
+                pane.resize(size, false).ok();
                 self.zoomed.replace(pane);
             }
         }
@@ -961,7 +961,7 @@ impl TabInner {
                 Err(c) => {
                     self.pane.replace(c.tree());
                     let size = self.size;
-                    apply_sizes_from_splits(self.pane.as_mut().unwrap(), &size);
+                    apply_sizes_from_splits(self.pane.as_mut().unwrap(), &size, false);
                     break;
                 }
             }
@@ -992,7 +992,7 @@ impl TabInner {
                 Err(c) => {
                     self.pane.replace(c.tree());
                     let size = self.size;
-                    apply_sizes_from_splits(self.pane.as_mut().unwrap(), &size);
+                    apply_sizes_from_splits(self.pane.as_mut().unwrap(), &size, false);
                     break;
                 }
             }
@@ -1136,7 +1136,7 @@ impl TabInner {
         self.size
     }
 
-    fn resize(&mut self, size: TerminalSize) {
+    fn resize(&mut self, size: TerminalSize, local: bool) {
         if size.rows == 0 || size.cols == 0 {
             // Ignore "impossible" resize requests
             return;
@@ -1144,7 +1144,7 @@ impl TabInner {
 
         if let Some(zoomed) = &self.zoomed {
             self.size = size;
-            zoomed.resize(size).ok();
+            zoomed.resize(size, local).ok();
         } else {
             let dims = cell_dimensions(&size);
             let (min_x, min_y) = compute_min_size(self.pane.as_mut().unwrap());
@@ -1176,7 +1176,7 @@ impl TabInner {
             self.size = size;
 
             // And then resize the individual panes to match
-            apply_sizes_from_splits(self.pane.as_mut().unwrap(), &size);
+            apply_sizes_from_splits(self.pane.as_mut().unwrap(), &size, local);
         }
 
         Mux::try_get().map(|mux| mux.notify(MuxNotification::TabResized(self.id)));
@@ -1357,7 +1357,7 @@ impl TabInner {
 
             if cursor.is_leaf() {
                 // Apply our size to the tty
-                cursor.leaf_mut().map(|pane| pane.resize(pane_size));
+                cursor.leaf_mut().map(|pane| pane.resize(pane_size, false));
             } else {
                 self.apply_pane_size(pane_size, &mut cursor);
             }
@@ -1664,13 +1664,13 @@ impl TabInner {
                         };
 
                         if let Some(unsplit) = cursor.leaf_mut() {
-                            unsplit.resize(size).ok();
+                            unsplit.resize(size, false).ok();
                         } else {
                             self.apply_pane_size(size, &mut cursor);
                         }
                     } else if !dead_panes.is_empty() {
                         // Apply our revised size to the tty
-                        pane.resize(pane_size).ok();
+                        pane.resize(pane_size, false).ok();
                     }
 
                     pane_index += 1;
@@ -1852,7 +1852,7 @@ impl TabInner {
 
             // Advise the panes of their new sizes
             let size = self.size;
-            apply_sizes_from_splits(self.pane.as_mut().unwrap(), &size);
+            apply_sizes_from_splits(self.pane.as_mut().unwrap(), &size, false);
         }
 
         // And update focus
@@ -2003,9 +2003,9 @@ impl TabInner {
                 // match the target size; it's easier to reuse
                 // existing resize logic that way
                 if request.target_is_second {
-                    self.resize(split_info.first.clone());
+                    self.resize(split_info.first.clone(), false);
                 } else {
-                    self.resize(split_info.second.clone());
+                    self.resize(split_info.second.clone(), false);
                 }
             }
 
@@ -2055,8 +2055,8 @@ impl TabInner {
                 (pane, existing_pane)
             };
 
-            pane1.resize(split_info.first)?;
-            pane2.resize(split_info.second.clone())?;
+            pane1.resize(split_info.first, false)?;
+            pane2.resize(split_info.second.clone(), false)?;
 
             *cursor.leaf_mut().unwrap() = pane1;
 
@@ -2280,7 +2280,7 @@ mod test {
         fn writer(&self) -> MappedMutexGuard<dyn std::io::Write> {
             unimplemented!()
         }
-        fn resize(&self, size: TerminalSize) -> anyhow::Result<()> {
+        fn resize(&self, size: TerminalSize, _local: bool) -> anyhow::Result<()> {
             *self.size.lock() = size;
             Ok(())
         }
